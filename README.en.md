@@ -84,7 +84,7 @@ docker run --rm --init --name dbhub-privacy \
   --transport http --port 8080 --config /config/dbhub.toml
 ```
 
-Replace both `/absolute/path/...` placeholders with absolute host paths. For a database on the Docker host, do not use `localhost` in the TOML; on Docker Desktop for macOS/Windows, use `host.docker.internal`. Point an MCP client at `http://127.0.0.1:8080/mcp`; opening that URL in a browser is not a connection test. The Docker `1.0.0` tag will only become available after this repository's version change is merged into `main` and its automatic publish succeeds; use `latest` until then.
+Replace both `/absolute/path/...` placeholders with absolute host paths. For a database on the Docker host, do not use `localhost` in the TOML; on Docker Desktop for macOS/Windows, use `host.docker.internal`. Point an MCP client at `http://127.0.0.1:8080/mcp`; opening that URL in a browser is not a connection test.
 
 Restart DBHub after changing privacy settings; hot reload will not partially apply a new privacy policy. `search_objects` can still return object definitions and column names. `explain_sql` keeps its upstream behavior: Oracle's built-in execution-plan implementation writes and cleans up `PLAN_TABLE` rows but does not execute the explained business query. See the [privacy configuration guide](docs/privacy-select-guard.md) for details.
 

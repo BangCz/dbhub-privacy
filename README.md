@@ -84,7 +84,7 @@ docker run --rm --init --name dbhub-privacy \
   --transport http --port 8080 --config /config/dbhub.toml
 ```
 
-将两个 `/absolute/path/...` 换成本机绝对路径。如果数据库运行在 Docker 宿主机，TOML 中的数据库地址不能写 `localhost`；在 Mac/Windows Docker Desktop 上可用 `host.docker.internal`。MCP 客户端连接 `http://127.0.0.1:8080/mcp`；直接用浏览器打开该地址不是连接测试。`1.0.0` 的 Docker 版本标签要等本仓库的版本变更合并到 `main` 并完成自动发布后才能使用，目前请用 `latest`。
+将两个 `/absolute/path/...` 换成本机绝对路径。如果数据库运行在 Docker 宿主机，TOML 中的数据库地址不能写 `localhost`；在 Mac/Windows Docker Desktop 上可用 `host.docker.internal`。MCP 客户端连接 `http://127.0.0.1:8080/mcp`；直接用浏览器打开该地址不是连接测试。
 
 修改隐私配置后要重启 DBHub；配置热更新不会半更新这套策略。`search_objects` 仍可返回对象结构和字段名称；`explain_sql` 维持原有行为，其中 Oracle 内置执行计划会写入并清理 `PLAN_TABLE`，但不运行被解释的业务 SQL。详细规则见[隐私配置说明](docs/privacy-select-guard.md)。
 
