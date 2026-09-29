@@ -85,3 +85,5 @@ source = "example"
 ```
 
 容器集成测试需要可用的容器运行时。问题反馈和上游通用功能请先区分本分支与[原项目](https://github.com/bytebase/dbhub)。
+
+感谢 [LINUX DO 社区](https://linux.do/) 提供开源交流平台。
