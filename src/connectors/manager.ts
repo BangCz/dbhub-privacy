@@ -253,6 +253,7 @@ export class ConnectorManager {
 
     // Build config for database-specific options
     const config: ConnectorConfig = {};
+    if (source.privacy?.enabled) config.privacy = source.privacy;
     if (source.connection_timeout !== undefined) {
       config.connectionTimeoutSeconds = source.connection_timeout;
     }

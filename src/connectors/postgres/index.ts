@@ -26,6 +26,8 @@ import { splitSQLStatements } from "../../utils/sql-parser.js";
 import { FailedToReadCertificate } from "./failed-to-read-certificate.js";
 import { postgresTypeParsers } from "./type-parsers.js";
 import { closeQuietly } from "../../utils/resource-cleanup.js";
+import { SelectGuard, PrivacyError, type Relation } from "../../privacy/select-guard.js";
+import type { PrivacyConfig } from "../../types/config.js";
 
 const POSTGRES_CLIENT_QUERY_TIMEOUT_GRACE_MS = 5_000;
 
@@ -172,6 +174,7 @@ export class PostgresConnector implements Connector {
 
   // Default schema for discovery methods (first entry from search_path, or "public")
   private defaultSchema: string = "public";
+  private privacyConfig?: PrivacyConfig;
 
   getId(): string {
     return this.sourceId;
@@ -182,8 +185,12 @@ export class PostgresConnector implements Connector {
   }
 
   async connect(dsn: string, initScript?: string, config?: ConnectorConfig): Promise<void> {
+    if (config?.privacy?.enabled && initScript?.trim()) {
+      throw new PrivacyError("PRIVACY_QUERY_UNSUPPORTED", "PostgreSQL 隐私模式不支持初始化脚本");
+    }
     // Reset default schema in case this connector instance is re-used across connect() calls
     this.defaultSchema = "public";
+    this.privacyConfig = config?.privacy?.enabled ? config.privacy : undefined;
 
     try {
       const poolConfig = await this.dsnParser.parse(dsn, config);
@@ -708,6 +715,10 @@ export class PostgresConnector implements Connector {
 
     const client = await this.pool.connect();
     try {
+      if (this.privacyConfig) {
+        await new SelectGuard("postgres", this.privacyConfig,
+          (table, schema) => this.privacyRelation(client, table, schema), this.defaultSchema).check(sql);
+      }
       // Check if this is a multi-statement query
       const statements = splitSQLStatements(sql, "postgres");
 
@@ -811,8 +822,36 @@ export class PostgresConnector implements Connector {
 
         return { resultSets };
       }
+    } catch (error) {
+      if (this.privacyConfig && !(error instanceof PrivacyError)) {
+        throw new PrivacyError("PRIVACY_QUERY_UNSUPPORTED", "查询执行失败；隐私模式不回显数据库错误详情");
+      }
+      throw error;
     } finally {
       client.release();
+    }
+  }
+
+  /** Resolve SQL identifiers through the session's actual search_path. Catalog rows only. */
+  private async privacyRelation(client: pg.PoolClient, table: string, schema?: string): Promise<Relation | null> {
+    try {
+      const result = await client.query<{
+        schema: string; table: string; column: string; view_sql: string | null;
+      }>(`
+        SELECT n.nspname AS schema, c.relname AS table, a.attname AS column,
+               CASE WHEN c.relkind IN ('v', 'm') THEN pg_get_viewdef(c.oid, true) END AS view_sql
+        FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+             JOIN pg_attribute a ON a.attrelid = c.oid
+        WHERE c.oid = to_regclass(CASE WHEN $2::text IS NULL
+          THEN format('%I', $1::text) ELSE format('%I.%I', $2::text, $1::text) END)
+          AND c.relkind IN ('r', 'v', 'm') AND a.attnum > 0 AND NOT a.attisdropped
+        ORDER BY a.attnum`, [table, schema ?? null]);
+      if (!result.rows.length) return null;
+      const first = result.rows[0];
+      return { schema: first.schema, table: first.table,
+        columns: result.rows.map((row) => row.column), viewSql: first.view_sql ?? undefined };
+    } catch {
+      throw new PrivacyError("PRIVACY_QUERY_UNSUPPORTED", `无法解析对象 ${table} 的字段来源`);
     }
   }
 }

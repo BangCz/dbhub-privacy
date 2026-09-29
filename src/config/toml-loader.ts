@@ -382,6 +382,24 @@ function validateDSNFieldConflicts(source: SourceConfig, configPath: string): vo
  * Validate a single source configuration
  */
 function validateSourceConfig(source: SourceConfig, configPath: string): void {
+  if (source.privacy !== undefined) {
+    const privacy = source.privacy;
+    const validName = (name: unknown): name is string => typeof name === "string" && name.length > 0 && !name.includes("\0");
+    if (!privacy || typeof privacy !== "object" || typeof privacy.enabled !== "boolean" ||
+        (privacy.enabled && (!Array.isArray(privacy.blocked_columns) || !privacy.blocked_columns.length)) ||
+        (privacy.blocked_columns !== undefined && !Array.isArray(privacy.blocked_columns)) ||
+        (privacy.blocked_functions !== undefined && (!Array.isArray(privacy.blocked_functions) ||
+          privacy.blocked_functions.some((fn) => typeof fn !== "string" ||
+            !/^[A-Za-z_][A-Za-z_0-9$#]*$/.test(fn)))) ||
+        privacy.blocked_columns?.some((entry) => !entry || !validName(entry.schema) ||
+          !validName(entry.table) || !Array.isArray(entry.columns) || entry.columns.length === 0 ||
+          entry.columns.some((column) => !validName(column)))) {
+      throw new Error(`Configuration file ${configPath}: source '${source.id}' has invalid privacy configuration`);
+    }
+    if (privacy.enabled && source.type !== "postgres" && source.type !== "oracle") {
+      throw new Error(`Configuration file ${configPath}: source '${source.id}' privacy supports PostgreSQL and Oracle only`);
+    }
+  }
   const hasConnectionParams =
     source.type && (source.type === "sqlite" ? source.database : source.host);
 

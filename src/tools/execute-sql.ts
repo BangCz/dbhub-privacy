@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { PrivacyError } from "../privacy/select-guard.js";
 import { ConnectorManager } from "../connectors/manager.js";
 import { createToolSuccessResponse, createToolErrorResponse } from "../utils/response-formatter.js";
 import { allowedKeywords } from "../utils/allowed-keywords.js";
@@ -79,6 +80,7 @@ export function createExecuteSqlToolHandler(sourceId?: string) {
     } catch (error) {
       success = false;
       errorMessage = (error as Error).message;
+      if (error instanceof PrivacyError) return createToolErrorResponse(errorMessage, error.code);
       const classified = tryClassifyConnectionError(error, sourceId, effectiveSourceId);
       if (classified) return classified;
       return createToolErrorResponse(errorMessage, "EXECUTION_ERROR");

@@ -32,6 +32,75 @@ describe('TOML Configuration Tests', () => {
   });
 
   describe('loadTomlConfig', () => {
+    it('loads source-scoped privacy columns for PostgreSQL and Oracle', () => {
+      for (const dsn of ['postgres://user:pass@localhost:5432/db', 'oracle://user:pass@localhost:1521/XEPDB1']) {
+        fs.writeFileSync(path.join(tempDir, 'dbhub.toml'), `
+[[sources]]
+id = "protected"
+dsn = "${dsn}"
+[sources.privacy]
+enabled = true
+blocked_functions = ["decrypt_one", "decrypt_secret"]
+[[sources.privacy.blocked_columns]]
+schema = "SAMPLE"
+table = "PEOPLE"
+columns = ["ID_CARD"]
+`);
+        expect(loadTomlConfig()?.sources[0].privacy?.blocked_columns?.[0].columns).toEqual(['ID_CARD']);
+        expect(loadTomlConfig()?.sources[0].privacy?.blocked_functions).toEqual(['decrypt_one', 'decrypt_secret']);
+      }
+    });
+
+    it('rejects malformed configured function names', () => {
+      fs.writeFileSync(path.join(tempDir, 'dbhub.toml'), `
+[[sources]]
+id = "protected"
+dsn = "postgres://user:pass@localhost:5432/db"
+[sources.privacy]
+enabled = true
+blocked_functions = ["decrypt(); SELECT 1"]
+[[sources.privacy.blocked_columns]]
+schema = "sample"
+table = "personnel"
+columns = ["id_card"]
+`);
+      expect(() => loadTomlConfig()).toThrow('invalid privacy configuration');
+    });
+
+    it('rejects enabled privacy with missing columns or an unsupported connector', () => {
+      fs.writeFileSync(path.join(tempDir, 'dbhub.toml'), `
+[[sources]]
+id = "protected"
+dsn = "postgres://user:pass@localhost:5432/db"
+[sources.privacy]
+enabled = true
+`);
+      expect(() => loadTomlConfig()).toThrow('invalid privacy configuration');
+      fs.writeFileSync(path.join(tempDir, 'dbhub.toml'), `
+[[sources]]
+id = "protected"
+dsn = "mysql://user:pass@localhost:3306/db"
+[sources.privacy]
+enabled = true
+[[sources.privacy.blocked_columns]]
+schema = "app"
+table = "people"
+columns = ["id_card"]
+`);
+      expect(() => loadTomlConfig()).toThrow('supports PostgreSQL and Oracle only');
+    });
+
+    it('allows explicitly disabled privacy without a column list', () => {
+      fs.writeFileSync(path.join(tempDir, 'dbhub.toml'), `
+[[sources]]
+id = "unprotected"
+dsn = "postgres://user:pass@localhost:5432/db"
+[sources.privacy]
+enabled = false
+`);
+      expect(loadTomlConfig()?.sources[0].privacy).toEqual({ enabled: false });
+    });
+
     it('should load valid TOML config from dbhub.toml', () => {
       const tomlContent = `
 [[sources]]

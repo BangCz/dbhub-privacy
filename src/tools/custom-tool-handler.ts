@@ -4,6 +4,7 @@
  */
 
 import { z } from "zod";
+import { PrivacyError } from "../privacy/select-guard.js";
 import { ToolConfig, ParameterConfig } from "../types/config.js";
 import { ConnectorManager } from "../connectors/manager.js";
 import {
@@ -233,6 +234,7 @@ export function createCustomToolHandler(toolConfig: ToolConfig) {
     } catch (error) {
       success = false;
       errorMessage = (error as Error).message;
+      if (error instanceof PrivacyError) return createToolErrorResponse(errorMessage, error.code);
 
       // A connection/access failure is not a SQL problem — classify and return
       // it cleanly, ahead of the ZodError / SQL-context augmentation below.

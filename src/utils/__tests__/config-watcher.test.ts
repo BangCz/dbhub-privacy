@@ -96,6 +96,21 @@ describe("startConfigWatcher", () => {
     });
   });
 
+  it("keeps the live source policy until restart when privacy changes", async () => {
+    vi.mocked(resolveTomlConfigPath).mockReturnValue("/path/to/dbhub.toml");
+    const oldSource = { id: "db", type: "postgres" as const, dsn: "postgres://localhost/db",
+      privacy: { enabled: true, blocked_columns: [{ schema: "public", table: "people", columns: ["id_card"] }] } };
+    const newSource = { ...oldSource, privacy: { enabled: true, blocked_columns: [
+      { schema: "public", table: "people", columns: ["id_card", "email"] }] } };
+    vi.mocked(loadTomlConfig).mockReturnValue({ sources: [newSource], source: "dbhub.toml" });
+    const mockManager = createMockManager({ getAllSourceConfigs: vi.fn().mockReturnValue([oldSource]) });
+    startConfigWatcher(createOptions(mockManager));
+    watchCallback("change");
+    await vi.advanceTimersByTimeAsync(500);
+    expect(mockManager.disconnect).not.toHaveBeenCalled();
+    expect(mockManager.connectWithSources).not.toHaveBeenCalled();
+  });
+
   it("should debounce rapid file changes", async () => {
     vi.mocked(resolveTomlConfigPath).mockReturnValue("/path/to/dbhub.toml");
     vi.mocked(loadTomlConfig).mockReturnValue({

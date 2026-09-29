@@ -24,6 +24,8 @@ import {
 } from "../../utils/sql-parser.js";
 import { isReadOnlySQL } from "../../utils/allowed-keywords.js";
 import { closeQuietly } from "../../utils/resource-cleanup.js";
+import { SelectGuard, PrivacyError, type Relation } from "../../privacy/select-guard.js";
+import type { PrivacyConfig } from "../../types/config.js";
 
 /** What the DSN parser hands to the connector. */
 export interface OracleConnectionConfig {
@@ -146,6 +148,7 @@ export class OracleConnector implements Connector {
   private callTimeoutMs?: number;
   /** CURRENT_SCHEMA of the connected session, resolved once at connect time */
   private defaultSchema = "";
+  private privacyConfig?: PrivacyConfig;
   // Source ID is set by ConnectorManager after cloning
   private sourceId: string = "default";
 
@@ -184,6 +187,7 @@ export class OracleConnector implements Connector {
         "SELECT SYS_CONTEXT('USERENV', 'CURRENT_SCHEMA') AS schema_name FROM dual"
       );
       this.defaultSchema = rows[0]?.SCHEMA_NAME ?? OracleConnector.foldIdentifier(parsed.pool.user ?? "");
+      this.privacyConfig = config?.privacy?.enabled ? config.privacy : undefined;
 
       if (initScript) {
         await this.executeSQL(initScript, {});
@@ -745,6 +749,10 @@ export class OracleConnector implements Connector {
 
     const connection = await this.acquire();
     try {
+      if (this.privacyConfig) {
+        await new SelectGuard("oracle", this.privacyConfig,
+          (table, schema) => this.privacyRelation(connection, table, schema), this.defaultSchema).check(afterNoise);
+      }
       // Engine-level read-only enforcement: a READ ONLY transaction makes the
       // server itself reject DML (ORA-01456). DDL is not covered by it (DDL
       // implicitly commits and so ends the transaction), which is why the
@@ -788,9 +796,39 @@ export class OracleConnector implements Connector {
     } catch (error) {
       // Best-effort rollback so a failed ROLLBACK cannot mask the original error.
       await closeQuietly(() => connection.rollback());
+      if (this.privacyConfig && !(error instanceof PrivacyError)) {
+        throw new PrivacyError("PRIVACY_QUERY_UNSUPPORTED", "查询执行失败；隐私模式不回显数据库错误详情");
+      }
+      if (error instanceof PrivacyError) throw error;
       throw OracleConnector.wrapError("Failed to execute query", error);
     } finally {
       await connection.close();
+    }
+  }
+
+  /** Resolve owner, columns and complete view SQL from read-only Oracle catalog rows. */
+  private async privacyRelation(connection: oracledb.Connection, table: string, schema?: string): Promise<Relation | null> {
+    if (!schema && table === "DUAL") return { schema: "SYS", table: "DUAL", columns: ["DUMMY"] };
+    try {
+      const owner = schema ?? this.defaultSchema;
+      const rows = await OracleConnector.fetchRows<{ OWNER: string; OBJECT_NAME: string; COLUMN_NAME: string; OBJECT_TYPE: string; TEXT_VC: string | null }>(connection, `
+        SELECT o.owner, o.object_name, c.column_name, o.object_type, v.text_vc
+        FROM all_objects o JOIN all_tab_columns c
+          ON c.owner = o.owner AND c.table_name = o.object_name
+        LEFT JOIN all_views v ON v.owner = o.owner AND v.view_name = o.object_name
+        WHERE o.owner = :owner AND o.object_name = :name
+          AND o.object_type IN ('TABLE', 'VIEW')
+        ORDER BY c.column_id`, { owner, name: table });
+      if (!rows.length) return null;
+      const first = rows[0];
+      if (first.OBJECT_TYPE === "VIEW" && (!first.TEXT_VC || first.TEXT_VC.length >= 4000)) {
+        throw new PrivacyError("PRIVACY_QUERY_UNSUPPORTED", `无法读取视图 ${table} 的完整定义`);
+      }
+      return { schema: first.OWNER, table: first.OBJECT_NAME,
+        columns: rows.map((row) => row.COLUMN_NAME), viewSql: first.TEXT_VC ?? undefined };
+    } catch (error) {
+      if (error instanceof PrivacyError) throw error;
+      throw new PrivacyError("PRIVACY_QUERY_UNSUPPORTED", `无法解析对象 ${table} 的字段来源`);
     }
   }
 

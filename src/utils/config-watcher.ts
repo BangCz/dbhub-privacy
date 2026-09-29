@@ -59,6 +59,15 @@ export function startConfigWatcher(options: ConfigWatcherOptions): (() => void) 
         console.error("Config reload: failed to load TOML config, keeping existing connections.");
         return;
       }
+      // Privacy policy changes require a restart; retain all current connections.
+      const privacyById = (sources: SourceConfig[]) => JSON.stringify(
+        sources.filter((source) => source.privacy !== undefined)
+          .map(({ id, privacy }) => ({ id, privacy })).sort((a, b) => a.id.localeCompare(b.id))
+      );
+      if (privacyById(newConfig.sources) !== privacyById(lastGoodSources)) {
+        console.error("Privacy configuration changed; restart DBHub to apply it. Keeping current configuration.");
+        return;
+      }
 
       // Save current config for rollback
       const oldSources = lastGoodSources;

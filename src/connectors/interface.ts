@@ -138,6 +138,8 @@ export interface ExecuteOptions {
  * Different databases may use different subset of these options
  */
 export interface ConnectorConfig {
+  /** Source-scoped output guard; only PostgreSQL and Oracle support it. */
+  privacy?: import("../types/config.js").PrivacyConfig;
   /** Connection timeout in seconds (PostgreSQL, MySQL, MariaDB, SQL Server) */
   connectionTimeoutSeconds?: number;
   /** Query timeout in seconds (PostgreSQL, MySQL, MariaDB, SQL Server) */
