@@ -15,9 +15,8 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Version to publish (e.g., 0.1.0, 0.2.0-beta)"
-        required: false
-        default: ""
+        description: "Version to publish (first release: 1.0.0)"
+        required: true
       tag:
         description: "NPM tag (e.g., latest, dev)"
         required: false
@@ -73,7 +72,6 @@ jobs:
           INPUT_TAG: ${{ inputs.tag }}
         run: |
           VERSION="$INPUT_VERSION"
-          if [ -z "$VERSION" ]; then VERSION=$(jq -r '.version' package.json); fi
           TAG="${INPUT_TAG:-latest}"
 
           echo "PACKAGE_VERSION=${VERSION}" >> "$GITHUB_ENV"

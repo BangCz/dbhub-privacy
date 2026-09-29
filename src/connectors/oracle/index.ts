@@ -749,17 +749,18 @@ export class OracleConnector implements Connector {
 
     const connection = await this.acquire();
     try {
-      if (this.privacyConfig) {
-        await new SelectGuard("oracle", this.privacyConfig,
-          (table, schema) => this.privacyRelation(connection, table, schema), this.defaultSchema).check(afterNoise);
-      }
       // Engine-level read-only enforcement: a READ ONLY transaction makes the
       // server itself reject DML (ORA-01456). DDL is not covered by it (DDL
       // implicitly commits and so ends the transaction), which is why the
       // keyword classifier in front of this connector stays the first line of
-      // defense; this is the backstop behind it.
+      // defense; this is the backstop behind it. Start it before the privacy
+      // guard's catalog queries: Oracle requires SET TRANSACTION to come first.
       if (options.readonly) {
         await connection.execute("SET TRANSACTION READ ONLY");
+      }
+      if (this.privacyConfig) {
+        await new SelectGuard("oracle", this.privacyConfig,
+          (table, schema) => this.privacyRelation(connection, table, schema), this.defaultSchema).check(afterNoise);
       }
 
       const resultSets: SQLResultSet[] = [];
