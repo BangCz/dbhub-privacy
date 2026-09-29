@@ -15,7 +15,13 @@
 
 ## 快速开始
 
-需要 Node.js 22.5.0 或更新版本。安装依赖并构建本仓库，然后使用**本地构建产物**启动：
+需要 Node.js 22.5.0 或更新版本。使用已发布的 `1.0.0`：
+
+```bash
+npx -y @czbang/dbhub-privacy@1.0.0 --transport stdio --config /path/outside/repo/dbhub.toml
+```
+
+开发本仓库时，也可以安装依赖并使用**本地构建产物**启动：
 
 ```bash
 pnpm install
@@ -24,6 +30,10 @@ node dist/index.js --transport stdio --config /path/outside/repo/dbhub.toml
 ```
 
 `npx @bytebase/dbhub@latest` 启动的是上游版本，**不会加载本分支新增的隐私拦截代码**。真实配置文件应保存在仓库外，不要提交连接地址、账号、密码或本地隐私字段清单。
+
+## 后续发布
+
+先将代码和 `package.json` 版本号更新到下一个未发布版本（例如 `1.0.1`），并合并到 `main`。推送到 `main` 会自动发布 Docker `latest`；版本号发生变化时还会发布对应版本标签，并自动构建该版本的 MCP Bundle，上传到 GitHub Release。npm 不会自动发布：到 [Publish to npm](https://github.com/BangCz/dbhub-privacy/actions/workflows/npm-publish.yml) 手动运行工作流，选择 `main`，填写与 `package.json` 相同的版本号，稳定版使用 `latest` 标签。已发布的 npm 版本号不能重用。
 
 以下 TOML 仅使用虚构对象；Oracle 请把数据库类型、端口、服务名及目录对象名改成实际值，未加引号的 Oracle 对象通常使用大写名称。
 

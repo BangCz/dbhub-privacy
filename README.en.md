@@ -15,7 +15,13 @@ This is **not** a complete inference-prevention system. Protected columns may st
 
 ## Quick start
 
-Node.js 22.5.0 or newer is required. Install dependencies, build this repository, and launch the **local build**:
+Node.js 22.5.0 or newer is required. To run the published `1.0.0` release:
+
+```bash
+npx -y @czbang/dbhub-privacy@1.0.0 --transport stdio --config /path/outside/repo/dbhub.toml
+```
+
+For local development, install dependencies, build this repository, and launch the **local build**:
 
 ```bash
 pnpm install
@@ -24,6 +30,10 @@ node dist/index.js --transport stdio --config /path/outside/repo/dbhub.toml
 ```
 
 `npx @bytebase/dbhub@latest` runs the upstream package; it **does not include this fork's privacy guard**. Keep real TOML configuration outside the repository. Never commit connection endpoints, accounts, passwords, or local protected-column lists.
+
+## Future releases
+
+Update the code and `package.json` to the next unpublished version (for example, `1.0.1`), then merge into `main`. A push to `main` automatically publishes the Docker `latest` tag; a version change also publishes a versioned image and builds the corresponding MCP Bundle for a GitHub Release. npm publishing is manual: run [Publish to npm](https://github.com/BangCz/dbhub-privacy/actions/workflows/npm-publish.yml) on `main`, enter the same version as `package.json`, and use the `latest` tag for a stable release. An already published npm version cannot be reused.
 
 The example below uses fictional objects only. For Oracle, set the correct type, port, service name, and catalog spelling; unquoted Oracle objects are normally uppercase.
 
