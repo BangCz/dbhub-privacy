@@ -57,6 +57,7 @@ describe("Oracle connector privacy boundary", () => {
     await expect(
       connector.executeSQL("SELECT ID_CARD FROM PEOPLE", { readonly: true })
     ).rejects.toThrow("PRIVACY_SELECT_DENIED");
+    expect(execute.mock.calls[0][0]).toBe("SET TRANSACTION READ ONLY");
     expect(execute.mock.calls.some(([sql]) => sql.includes("SELECT ID_CARD FROM PEOPLE"))).toBe(
       false
     );
