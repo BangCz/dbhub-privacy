@@ -15,7 +15,13 @@
 
 ## 快速开始
 
-需要 Node.js 22.5.0 或更新版本。安装依赖并构建本仓库，然后使用**本地构建产物**启动：
+需要 Node.js 22.5.0 或更新版本。使用已发布的 `1.0.0`：
+
+```bash
+npx -y @czbang/dbhub-privacy@1.0.0 --transport stdio --config /path/outside/repo/dbhub.toml
+```
+
+开发本仓库时，也可以安装依赖并使用**本地构建产物**启动：
 
 ```bash
 pnpm install
@@ -64,6 +70,21 @@ source = "example"
 | `sources.privacy.blocked_functions` | 配置禁止在业务 SQL 中调用的函数名；例如配置 `decrypt_secret` 也会拦截 `pkg.decrypt_secret(...)`。 |
 | `tools[].readonly` | 为 `execute_sql` 和**每个自定义 SQL 工具**分别开启只读；不能写在连接级。 |
 | `tools[].max_rows` | 限制该工具的返回行数，不代替只读或隐私保护。 |
+
+## Docker 使用
+
+把 TOML 放在仓库外，并将配置引用的环境变量写入同样不提交的 `dbhub.env`（例如 `DBHUB_EXAMPLE_PASSWORD=...`）。使用已经发布的 `latest` 镜像：
+
+```bash
+docker run --rm --init --name dbhub-privacy \
+  -p 127.0.0.1:8080:8080 \
+  --mount type=bind,src=/absolute/path/dbhub.toml,dst=/config/dbhub.toml,readonly \
+  --env-file /absolute/path/dbhub.env \
+  czbang/dbhub-privacy:latest \
+  --transport http --port 8080 --config /config/dbhub.toml
+```
+
+将两个 `/absolute/path/...` 换成本机绝对路径。如果数据库运行在 Docker 宿主机，TOML 中的数据库地址不能写 `localhost`；在 Mac/Windows Docker Desktop 上可用 `host.docker.internal`。MCP 客户端连接 `http://127.0.0.1:8080/mcp`；直接用浏览器打开该地址不是连接测试。
 
 修改隐私配置后要重启 DBHub；配置热更新不会半更新这套策略。`search_objects` 仍可返回对象结构和字段名称；`explain_sql` 维持原有行为，其中 Oracle 内置执行计划会写入并清理 `PLAN_TABLE`，但不运行被解释的业务 SQL。详细规则见[隐私配置说明](docs/privacy-select-guard.md)。
 

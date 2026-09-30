@@ -15,7 +15,13 @@ This is **not** a complete inference-prevention system. Protected columns may st
 
 ## Quick start
 
-Node.js 22.5.0 or newer is required. Install dependencies, build this repository, and launch the **local build**:
+Node.js 22.5.0 or newer is required. To run the published `1.0.0` release:
+
+```bash
+npx -y @czbang/dbhub-privacy@1.0.0 --transport stdio --config /path/outside/repo/dbhub.toml
+```
+
+For local development, install dependencies, build this repository, and launch the **local build**:
 
 ```bash
 pnpm install
@@ -64,6 +70,21 @@ source = "example"
 | `sources.privacy.blocked_functions` | Deny named functions in business SQL; `decrypt_secret` also matches `pkg.decrypt_secret(...)`. |
 | `tools[].readonly` | Enable read-only mode separately for `execute_sql` and **every custom SQL tool**. This is not a source-level option. |
 | `tools[].max_rows` | Cap result rows for that tool. It is not a substitute for read-only mode or privacy protection. |
+
+## Docker usage
+
+Keep the TOML file outside the repository. Put any environment variables referenced by it in an uncommitted `dbhub.env` file (for example, `DBHUB_EXAMPLE_PASSWORD=...`). Run the already published `latest` image:
+
+```bash
+docker run --rm --init --name dbhub-privacy \
+  -p 127.0.0.1:8080:8080 \
+  --mount type=bind,src=/absolute/path/dbhub.toml,dst=/config/dbhub.toml,readonly \
+  --env-file /absolute/path/dbhub.env \
+  czbang/dbhub-privacy:latest \
+  --transport http --port 8080 --config /config/dbhub.toml
+```
+
+Replace both `/absolute/path/...` placeholders with absolute host paths. For a database on the Docker host, do not use `localhost` in the TOML; on Docker Desktop for macOS/Windows, use `host.docker.internal`. Point an MCP client at `http://127.0.0.1:8080/mcp`; opening that URL in a browser is not a connection test.
 
 Restart DBHub after changing privacy settings; hot reload will not partially apply a new privacy policy. `search_objects` can still return object definitions and column names. `explain_sql` keeps its upstream behavior: Oracle's built-in execution-plan implementation writes and cleans up `PLAN_TABLE` rows but does not execute the explained business query. See the [privacy configuration guide](docs/privacy-select-guard.md) for details.
 
