@@ -26,16 +26,11 @@ function tomlBody(relPath: string): string {
 }
 
 describe("Claude Code plugin consistency", () => {
-  const pkg = readJson("package.json");
   const manifest = readJson("plugin/.claude-plugin/plugin.json");
   const mcp = readJson("plugin/.mcp.json");
 
-  it("plugin version matches package.json", () => {
-    expect(manifest.version).toBe(pkg.version);
-  });
-
   it(".mcp.json pins the npm package at the plugin version", () => {
-    expect(mcp.mcpServers.dbhub.args).toContain(`@bytebase/dbhub@${pkg.version}`);
+    expect(mcp.mcpServers.dbhub.args).toContain(`@bytebase/dbhub@${manifest.version}`);
   });
 
   it("server.json description fits the MCP Registry's 100-character limit", () => {
@@ -46,11 +41,11 @@ describe("Claude Code plugin consistency", () => {
     expect(server.description.length).toBeLessThanOrEqual(100);
   });
 
-  it("server.json version matches package.json", () => {
+  it("upstream server.json version matches the upstream plugin", () => {
     const server = readJson("server.json");
-    expect(server.version).toBe(pkg.version);
+    expect(server.version).toBe(manifest.version);
     const npmPackage = server.packages.find((p: any) => p.identifier === "@bytebase/dbhub");
-    expect(npmPackage.version).toBe(pkg.version);
+    expect(npmPackage.version).toBe(manifest.version);
   });
 
   it("plugin dbhub.toml policy matches the MCPB bundle's", () => {
